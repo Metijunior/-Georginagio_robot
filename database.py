@@ -120,3 +120,18 @@ def get_last_content_number():
     conn.close()
 
     return result + 1
+
+
+def get_all_users():
+
+    conn = sqlite3.connect(DB)
+    cur = conn.cursor()
+
+    cur.execute("SELECT user_id FROM users")
+
+    users = cur.fetchall()
+
+    conn.close()
+
+    return [user[0] for user in users]
+
