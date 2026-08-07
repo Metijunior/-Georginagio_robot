@@ -22,7 +22,8 @@ from database import (
     get_today_users,
     add_content,
     get_content,
-    get_last_content_number
+    get_last_content_number,
+    get_all_users
 )
 
 from server import start_server
@@ -46,6 +47,7 @@ admin_keyboard = ReplyKeyboardMarkup(
 panel_keyboard = ReplyKeyboardMarkup(
     [
         ["👥 تعداد کاربران", "📈 آمار امروز"],
+        ["📢 ارسال همگانی"],
         ["📸 افزودن عکس", "🎬 افزودن فیلم"],
         ["🔙 بازگشت"]
     ],
@@ -79,7 +81,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     add_user(user_id)
 
 
-    # لینک اختصاصی محتوا
     if context.args:
 
         content_id = context.args[0]
@@ -91,19 +92,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             content_type, file_id = content
 
             if content_type == "photo":
-
-                await update.message.reply_photo(
-                    file_id
-                )
+                await update.message.reply_photo(file_id)
 
             elif content_type == "video":
-
-                await update.message.reply_video(
-                    file_id
-                )
+                await update.message.reply_video(file_id)
 
             return
-
 
 
     if await check_member(user_id, context):
@@ -124,9 +118,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         else:
 
-            await update.message.reply_text(
-                text
-            )
+            await update.message.reply_text(text)
 
 
     else:
@@ -141,10 +133,48 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
+    if user_id != ADMIN_ID:
+        return
+
+
     text = update.message.text
 
 
-    if user_id != ADMIN_ID:
+    # حالت ارسال همگانی
+    if context.user_data.get("broadcast"):
+
+        users = get_all_users()
+
+        success = 0
+        failed = 0
+
+
+        for user in users:
+
+            try:
+
+                await update.message.copy(
+                    chat_id=user
+                )
+
+                success += 1
+
+
+            except:
+
+                failed += 1
+
+
+        context.user_data.clear()
+
+
+        await update.message.reply_text(
+            f"✅ ارسال همگانی انجام شد\n\n"
+            f"موفق: {success}\n"
+            f"ناموفق: {failed}",
+            reply_markup=panel_keyboard
+        )
+
         return
 
 
@@ -157,18 +187,34 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+
     elif text == "👥 تعداد کاربران":
 
         await update.message.reply_text(
-            f"👥 تعداد کل کاربران:\n\n{get_total_users()} نفر"
+            f"👥 تعداد کل کاربران:\n\n"
+            f"{get_total_users()} نفر"
         )
+
 
 
     elif text == "📈 آمار امروز":
 
         await update.message.reply_text(
-            f"📈 کاربران امروز:\n\n{get_today_users()} نفر"
+            f"📈 کاربران امروز:\n\n"
+            f"{get_today_users()} نفر"
         )
+
+
+
+    elif text == "📢 ارسال همگانی":
+
+        context.user_data["broadcast"] = True
+
+        await update.message.reply_text(
+            "📢 پیام خود را ارسال کن.\n\n"
+            "متن، عکس یا فیلم فرقی ندارد."
+        )
+
 
 
     elif text == "📸 افزودن عکس":
@@ -180,6 +226,7 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+
     elif text == "🎬 افزودن فیلم":
 
         context.user_data["upload"] = "video"
@@ -189,7 +236,10 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+
     elif text == "🔙 بازگشت":
+
+        context.user_data.clear()
 
         await update.message.reply_text(
             "برگشتیم.",
@@ -198,8 +248,7 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-    elif "upload" in context.user_data:
-
+    elif context.user_data.get("upload"):
 
         upload_type = context.user_data["upload"]
 
@@ -221,7 +270,6 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         number = get_last_content_number()
 
-
         content_id = f"{upload_type}_{number}"
 
 
@@ -232,7 +280,9 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-        bot_username = (await context.bot.get_me()).username
+        bot_username = (
+            await context.bot.get_me()
+        ).username
 
 
         link = (
@@ -244,7 +294,7 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"✅ ذخیره شد\n\n"
             f"شناسه:\n{content_id}\n\n"
-            f"لینک اختصاصی:\n{link}"
+            f"لینک:\n{link}"
         )
 
 
@@ -269,14 +319,16 @@ async def main():
 
     app.add_handler(
         MessageHandler(
-            filters.TEXT | filters.PHOTO | filters.VIDEO,
+            filters.ALL,
             messages
         )
     )
 
 
     await app.initialize()
+
     await app.start()
+
     await app.updater.start_polling()
 
 
