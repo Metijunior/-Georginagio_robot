@@ -1,9 +1,11 @@
 import os
 import asyncio
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 from database import init_db, add_user, get_total_users, get_today_users
+from server import start_server
 
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -21,35 +23,47 @@ async def check_member(user_id, context):
         return False
 
 
+async def send_welcome(update, user_id):
+
+    text = (
+        "سلام عشق🥰\n"
+        "خوش‌اومدی به ربات چنلمون❤️\n"
+        "بریم که از عکس و فیلم‌ها لذت ببریم😁💦"
+    )
+
+    keyboard = []
+
+    if user_id == ADMIN_ID:
+        keyboard.append(
+            [InlineKeyboardButton("👑 پنل مدیریت", callback_data="admin")]
+        )
+
+    await update.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+    )
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
 
     add_user(user_id)
 
     if await check_member(user_id, context):
-
-        text = (
-            "سلام عشق🥰\n"
-            "خوش‌اومدی به ربات چنلمون❤️\n"
-            "بریم که از عکس و فیلم‌ها لذت ببریم😁💦"
-        )
-
-        keyboard = []
-
-        if user_id == ADMIN_ID:
-            keyboard.append(
-                [InlineKeyboardButton("👑 پنل مدیریت", callback_data="admin")]
-            )
-
-        await update.message.reply_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-        )
+        await send_welcome(update, user_id)
 
     else:
+
         keyboard = [
-            [InlineKeyboardButton("📢 عضویت در کانال", url="https://t.me/Gorgina_Fans")],
-            [InlineKeyboardButton("✅ عضو شدم", callback_data="check")]
+            [InlineKeyboardButton(
+                "📢 عضویت در کانال",
+                url="https://t.me/Gorgina_Fans"
+            )],
+            [InlineKeyboardButton(
+                "✅ عضو شدم",
+                callback_data="check"
+            )]
         ]
 
         await update.message.reply_text(
@@ -82,15 +96,20 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if user_id == ADMIN_ID:
                 keyboard.append(
-                    [InlineKeyboardButton("👑 پنل مدیریت", callback_data="admin")]
+                    [InlineKeyboardButton(
+                        "👑 پنل مدیریت",
+                        callback_data="admin"
+                    )]
                 )
 
             await query.edit_message_text(
                 text,
-                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+                reply_markup=InlineKeyboardMarkup(keyboard)
+                if keyboard else None
             )
 
         else:
+
             await query.answer(
                 "❌ هنوز عضو کانال نشدی",
                 show_alert=True
@@ -103,8 +122,14 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         keyboard = [
-            [InlineKeyboardButton("👥 تعداد کاربران", callback_data="users")],
-            [InlineKeyboardButton("📈 آمار امروز", callback_data="today")]
+            [InlineKeyboardButton(
+                "👥 تعداد کاربران",
+                callback_data="users"
+            )],
+            [InlineKeyboardButton(
+                "📈 آمار امروز",
+                callback_data="today"
+            )]
         ]
 
         await query.edit_message_text(
@@ -132,6 +157,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def main():
+
+    start_server()
 
     init_db()
 
