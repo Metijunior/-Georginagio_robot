@@ -4,7 +4,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 TOKEN = os.getenv("BOT_TOKEN")
-
 CHANNEL = "@Gorgina_Fans"
 
 
@@ -21,10 +20,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if await check_member(user_id, context):
         await update.message.reply_text(
-    "سلام عشق🥰\n"
-    "خوش‌اومدی به ربات چنلمون❤️\n"
-    "بریم که از عکس و فیلم‌ها لذت ببریم😁💦"
-        )
+            "سلام عشق🥰\n"
+            "خوش‌اومدی به ربات چنلمون❤️\n"
+            "بریم که از عکس و فیلم‌ها لذت ببریم😁💦"
         )
     else:
         keyboard = [
@@ -42,10 +40,12 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_id = query.from_user.id
-
-    if await check_member(user_id, context):
-        await query.edit_message_text("✅ عضویت تایید شد.\nخوش آمدید!")
+    if await check_member(query.from_user.id, context):
+        await query.edit_message_text(
+            "سلام عشق🥰\n"
+            "خوش‌اومدی به ربات چنلمون❤️\n"
+            "بریم که از عکس و فیلم‌ها لذت ببریم😁💦"
+        )
     else:
         await query.answer("❌ هنوز عضو کانال نشده‌اید.", show_alert=True)
 
