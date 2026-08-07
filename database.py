@@ -15,6 +15,16 @@ def init_db():
     )
     """)
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS contents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        content_id TEXT UNIQUE,
+        content_type TEXT,
+        file_id TEXT,
+        created_date TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -58,3 +68,55 @@ def get_today_users():
 
     conn.close()
     return result
+
+
+def add_content(content_id, content_type, file_id):
+    conn = sqlite3.connect(DB)
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO contents 
+        (content_id, content_type, file_id, created_date)
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            content_id,
+            content_type,
+            file_id,
+            datetime.now().strftime("%Y-%m-%d")
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_content(content_id):
+    conn = sqlite3.connect(DB)
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT content_type, file_id FROM contents WHERE content_id=?",
+        (content_id,)
+    )
+
+    result = cur.fetchone()
+
+    conn.close()
+
+    return result
+
+
+def get_last_content_number():
+
+    conn = sqlite3.connect(DB)
+    cur = conn.cursor()
+
+    cur.execute("SELECT COUNT(*) FROM contents")
+
+    result = cur.fetchone()[0]
+
+    conn.close()
+
+    return result + 1
