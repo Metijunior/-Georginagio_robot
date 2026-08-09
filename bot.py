@@ -84,12 +84,54 @@ async def check_member(user_id, context):
 
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    user_id = update.effective_user.id
+if context.args:
 
-    add_user(user_id)
+    content_id = context.args[0]
 
+    content = get_content(content_id)
+
+    if content:
+
+        content_type, file_id = content
+
+        if content_type == "photo":
+
+            sent_message = await update.message.reply_photo(
+                file_id
+            )
+
+        elif content_type == "video":
+
+            sent_message = await update.message.reply_video(
+                file_id
+            )
+
+        else:
+            return
+
+
+        warning_message = await update.message.reply_text(
+            "⏳ این رسانه تا ۱ دقیقه دیگر حذف می‌شود."
+        )
+
+
+        await asyncio.sleep(60)
+
+
+        try:
+            await sent_message.delete()
+        except:
+            pass
+
+
+        try:
+            await warning_message.delete()
+        except:
+            pass
+
+
+        return
 
 
     if context.args:
