@@ -41,14 +41,12 @@ CHANNEL = "@Gorgina_Fans"
 ADMIN_ID = 416552077
 
 
-
 admin_keyboard = ReplyKeyboardMarkup(
     [
         [KeyboardButton("👑 پنل مدیریت")]
     ],
     resize_keyboard=True
 )
-
 
 
 panel_keyboard = ReplyKeyboardMarkup(
@@ -62,11 +60,9 @@ panel_keyboard = ReplyKeyboardMarkup(
 )
 
 
-
 async def check_member(user_id, context):
 
     try:
-
         member = await context.bot.get_chat_member(
             CHANNEL,
             user_id
@@ -78,60 +74,41 @@ async def check_member(user_id, context):
             "creator"
         ]
 
-    except:
-
+    except Exception:
         return False
 
 
+async def delete_media_later(
+    bot,
+    chat_id,
+    media_message_id,
+    warning_message_id
+):
 
+    await asyncio.sleep(60)
 
-if context.args:
-
-    content_id = context.args[0]
-
-    content = get_content(content_id)
-
-    if content:
-
-        content_type, file_id = content
-
-        if content_type == "photo":
-
-            sent_message = await update.message.reply_photo(
-                file_id
-            )
-
-        elif content_type == "video":
-
-            sent_message = await update.message.reply_video(
-                file_id
-            )
-
-        else:
-            return
-
-
-        warning_message = await update.message.reply_text(
-            "⏳ این رسانه تا ۱ دقیقه دیگر حذف می‌شود."
+    try:
+        await bot.delete_message(
+            chat_id=chat_id,
+            message_id=media_message_id
         )
+    except Exception:
+        pass
+
+    try:
+        await bot.delete_message(
+            chat_id=chat_id,
+            message_id=warning_message_id
+        )
+    except Exception:
+        pass
 
 
-        await asyncio.sleep(60)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    user_id = update.effective_user.id
 
-        try:
-            await sent_message.delete()
-        except:
-            pass
-
-
-        try:
-            await warning_message.delete()
-        except:
-            pass
-
-
-        return
+    add_user(user_id)
 
 
     if context.args:
@@ -140,7 +117,6 @@ if context.args:
 
         content = get_content(content_id)
 
-
         if content:
 
             content_type, file_id = content
@@ -148,20 +124,37 @@ if context.args:
 
             if content_type == "photo":
 
-                await update.message.reply_photo(
-                    file_id
+                sent_message = await update.message.reply_photo(
+                    photo=file_id
                 )
 
 
             elif content_type == "video":
 
-                await update.message.reply_video(
-                    file_id
+                sent_message = await update.message.reply_video(
+                    video=file_id
                 )
 
 
-            return
+            else:
+                return
 
+
+            warning_message = await update.message.reply_text(
+                "⏳ این رسانه تا ۱ دقیقه دیگر حذف می‌شود."
+            )
+
+
+            asyncio.create_task(
+                delete_media_later(
+                    context.bot,
+                    update.effective_chat.id,
+                    sent_message.message_id,
+                    warning_message.message_id
+                )
+            )
+
+            return
 
 
     if await check_member(user_id, context):
@@ -211,21 +204,20 @@ if context.args:
         )
 
 
-
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
 
     await query.answer()
 
-
     user_id = query.from_user.id
 
 
     if query.data == "check":
 
-
         if await check_member(user_id, context):
+
+            add_user(user_id)
 
             await query.edit_message_text(
                 "✅ عضویت شما تایید شد.\n\n"
@@ -247,19 +239,13 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     if user_id != ADMIN_ID:
-
         return
-
 
 
     text = update.message.text
 
 
-
-    # ارسال همگانی
-
     if context.user_data.get("broadcast"):
-
 
         users = get_all_users()
 
@@ -277,58 +263,49 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 success += 1
 
-
-            except:
+            except Exception:
 
                 failed += 1
-
 
 
         context.user_data.clear()
 
 
         await update.message.reply_text(
-            f"✅ ارسال انجام شد\n\n"
+            f"✅ ارسال همگانی انجام شد\n\n"
             f"موفق: {success}\n"
             f"ناموفق: {failed}",
             reply_markup=panel_keyboard
         )
 
-
         return
 
 
-
-
-    # آپلود محتوا
-
-
     if context.user_data.get("upload"):
-
 
         upload_type = context.user_data["upload"]
 
 
         if upload_type == "photo" and update.message.photo:
 
-
             file_id = update.message.photo[-1].file_id
 
 
         elif upload_type == "video" and update.message.video:
-
 
             file_id = update.message.video.file_id
 
 
         else:
 
+            await update.message.reply_text(
+                "❌ فایل مناسب ارسال نشده."
+            )
+
             return
 
 
-
         number = get_last_content_number()
-
 
         content_id = f"{upload_type}_{number}"
 
@@ -341,113 +318,112 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-        username = (
-            await context.bot.get_me()
-        ).username
+        bot_info = await context.bot.get_me()
+
+        bot_username = bot_info.username
 
 
         link = (
-            f"https://t.me/{username}"
+            f"https://t.me/{bot_username}"
             f"?start={content_id}"
         )
 
 
         await update.message.reply_text(
             f"✅ محتوا ذخیره شد\n\n"
-            f"شناسه:\n{content_id}\n\n"
-            f"لینک:\n{link}"
+            f"شناسه:\n"
+            f"{content_id}\n\n"
+            f"🔗 لینک اختصاصی:\n"
+            f"{link}"
         )
 
 
         context.user_data.clear()
 
-
         return
 
 
-
-
     if text == "👑 پنل مدیریت":
-
 
         await update.message.reply_text(
             "👑 پنل مدیریت",
             reply_markup=panel_keyboard
         )
 
+        return
 
 
-    elif text == "👥 تعداد کاربران":
-
+    if text == "👥 تعداد کاربران":
 
         await update.message.reply_text(
-            f"👥 تعداد کاربران:\n"
+            f"👥 تعداد کاربران:\n\n"
             f"{get_total_users()} نفر"
         )
 
+        return
 
 
-    elif text == "📊 آمار حرفه‌ای":
-
+    if text == "📊 آمار حرفه‌ای":
 
         await update.message.reply_text(
             f"📊 آمار ربات\n\n"
-            f"👥 کاربران:\n"
+            f"👥 کل کاربران:\n"
             f"{get_total_users()}\n\n"
-            f"📦 محتوا:\n"
+            f"📈 کاربران امروز:\n"
+            f"{get_today_users()}\n\n"
+            f"📦 تعداد محتوا:\n"
             f"{get_total_contents()}\n\n"
-            f"👁 بازدید محتوا:\n"
+            f"👁 مجموع بازدید محتوا:\n"
             f"{get_total_views()}"
         )
 
+        return
 
 
-    elif text == "📢 ارسال همگانی":
-
+    if text == "📢 ارسال همگانی":
 
         context.user_data["broadcast"] = True
 
-
         await update.message.reply_text(
-            "📢 پیام همگانی را ارسال کن."
+            "📢 پیام همگانی را ارسال کن.\n\n"
+            "متن، عکس یا فیلم می‌توانی بفرستی."
         )
 
+        return
 
 
-    elif text == "📸 افزودن عکس":
-
+    if text == "📸 افزودن عکس":
 
         context.user_data["upload"] = "photo"
 
-
         await update.message.reply_text(
-            "📸 عکس را بفرست."
+            "📸 عکس را ارسال کن."
         )
 
+        return
 
 
-    elif text == "🎬 افزودن فیلم":
-
+    if text == "🎬 افزودن فیلم":
 
         context.user_data["upload"] = "video"
 
-
         await update.message.reply_text(
-            "🎬 فیلم را بفرست."
+            "🎬 فیلم را ارسال کن."
         )
 
+        return
 
 
-    elif text == "🔙 بازگشت":
+    if text == "🔙 بازگشت":
 
         context.user_data.clear()
-
 
         await update.message.reply_text(
             "برگشتیم.",
             reply_markup=admin_keyboard
         )
 
+        return
 
 
 async def main():
@@ -457,8 +433,11 @@ async def main():
     init_db()
 
 
-    app = Application.builder().token(TOKEN).build()
-
+    app = (
+        Application.builder()
+        .token(TOKEN)
+        .build()
+    )
 
 
     app.add_handler(
@@ -469,13 +448,11 @@ async def main():
     )
 
 
-
     app.add_handler(
         CallbackQueryHandler(
             button
         )
     )
-
 
 
     app.add_handler(
@@ -486,7 +463,6 @@ async def main():
     )
 
 
-
     await app.initialize()
 
     await app.start()
@@ -494,9 +470,7 @@ async def main():
     await app.updater.start_polling()
 
 
-
     await asyncio.Event().wait()
-
 
 
 if __name__ == "__main__":
