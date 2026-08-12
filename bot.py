@@ -29,6 +29,8 @@ from database import (
     get_all_users,
     get_total_contents,
     get_total_views,
+    add_download,
+    get_total_downloads,
     create_collection,
     add_to_collection,
     get_collection
@@ -151,6 +153,8 @@ async def send_content(
         return False
 
 
+    add_download(content_id)
+
     warning = await update.message.reply_text(
         "⏳ این رسانه تا ۱ دقیقه دیگر حذف می‌شود."
     )
@@ -215,6 +219,8 @@ async def send_collection(
         message_ids.append(
             sent.message_id
         )
+
+        add_download(content_id)
 
 
     if not message_ids:
@@ -454,11 +460,10 @@ async def messages(
 
             create_collection(collection_id)
 
-            for position, item_id in enumerate(items, start=1):
-
+            for position, content_id in enumerate(items, start=1):
                 add_to_collection(
                     collection_id,
-                    item_id,
+                    content_id,
                     position
                 )
 
@@ -594,6 +599,7 @@ async def messages(
             return
 
 
+
     # =========================
     # 📸 آپلود تک رسانه
     # =========================
@@ -724,7 +730,9 @@ async def messages(
             f"📦 تعداد محتوا:\n"
             f"{get_total_contents()}\n\n"
             f"👁 مجموع بازدید:\n"
-            f"{get_total_views()}"
+            f"{get_total_views()}\n\n"
+            f"📥 مجموع دریافت:\n"
+            f"{get_total_downloads()}"
         )
 
         return
@@ -744,7 +752,7 @@ async def messages(
         await message.reply_text(
             "📢 پیام همگانی را ارسال کن.\n\n"
             "متن، عکس یا فیلم می‌توانی بفرستی.\n\n"
-            "برای لغو، «🔙 بازگشت» را بزن."
+            "برای لغو، پنل مدیریت را باز کن."
         )
 
         return
@@ -807,8 +815,8 @@ async def messages(
             "📦 حالت ساخت مجموعه فعال شد.\n\n"
             "حالا عکس‌ها و فیلم‌ها را یکی‌یکی "
             "برای من ارسال کن.\n\n"
-            "برای هر رسانه می‌توانی کپشن جداگانه "
-            "بگذاری.\n\n"
+            "می‌توانی برای هر رسانه کپشن جداگانه "
+            "بنویسی.\n\n"
             "وقتی تمام شد، دکمه:\n"
             "«✅ پایان مجموعه»\n"
             "را بزن.",
@@ -834,22 +842,11 @@ async def messages(
         return
 
 
-# ==========================================
-# MAIN
-# ==========================================
-
 async def main():
 
     start_server()
 
     init_db()
-
-
-    if not TOKEN:
-
-        raise RuntimeError(
-            "BOT_TOKEN environment variable is not set."
-        )
 
 
     app = (
@@ -895,4 +892,3 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
-
