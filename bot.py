@@ -54,7 +54,17 @@ panel_keyboard = ReplyKeyboardMarkup(
         ["👥 تعداد کاربران", "📊 آمار حرفه‌ای"],
         ["📢 ارسال همگانی"],
         ["📸 افزودن عکس", "🎬 افزودن فیلم"],
+        ["📦 ساخت مجموعه"],
         ["🔙 بازگشت"]
+    ],
+    resize_keyboard=True
+)
+
+
+collection_keyboard = ReplyKeyboardMarkup(
+    [
+        ["✅ پایان مجموعه"],
+        ["❌ لغو مجموعه"]
     ],
     resize_keyboard=True
 )
@@ -63,6 +73,7 @@ panel_keyboard = ReplyKeyboardMarkup(
 async def check_member(user_id, context):
 
     try:
+
         member = await context.bot.get_chat_member(
             CHANNEL,
             user_id
@@ -75,33 +86,155 @@ async def check_member(user_id, context):
         ]
 
     except Exception:
+
         return False
 
 
 async def delete_media_later(
     bot,
     chat_id,
-    media_message_id,
-    warning_message_id
+    message_ids
 ):
 
     await asyncio.sleep(60)
 
-    try:
-        await bot.delete_message(
-            chat_id=chat_id,
-            message_id=media_message_id
-        )
-    except Exception:
-        pass
+    for message_id in message_ids:
 
-    try:
-        await bot.delete_message(
-            chat_id=chat_id,
-            message_id=warning_message_id
+        try:
+
+            await bot.delete_message(
+                chat_id=chat_id,
+                message_id=message_id
+            )
+
+        except Exception:
+
+            pass
+
+
+async def send_content(
+    update,
+    context,
+    content_id
+):
+
+    content = get_content(content_id)
+
+    if not content:
+        return False
+
+
+    content_type, file_id, caption = content
+
+
+    if content_type == "photo":
+
+        sent = await update.message.reply_photo(
+            photo=file_id,
+            caption=caption or None
         )
-    except Exception:
-        pass
+
+
+    elif content_type == "video":
+
+        sent = await update.message.reply_video(
+            video=file_id,
+            caption=caption or None
+        )
+
+
+    else:
+
+        return False
+
+
+    warning = await update.message.reply_text(
+        "⏳ این رسانه تا ۱ دقیقه دیگر حذف می‌شود."
+    )
+
+
+    asyncio.create_task(
+        delete_media_later(
+            context.bot,
+            update.effective_chat.id,
+            [
+                sent.message_id,
+                warning.message_id
+            ]
+        )
+    )
+
+
+    return True
+
+
+async def send_collection(
+    update,
+    context,
+    content_ids
+):
+
+    message_ids = []
+
+
+    for content_id in content_ids:
+
+        content = get_content(content_id)
+
+        if not content:
+            continue
+
+
+        content_type, file_id, caption = content
+
+
+        if content_type == "photo":
+
+            sent = await update.message.reply_photo(
+                photo=file_id,
+                caption=caption or None
+            )
+
+
+        elif content_type == "video":
+
+            sent = await update.message.reply_video(
+                video=file_id,
+                caption=caption or None
+            )
+
+
+        else:
+
+            continue
+
+
+        message_ids.append(
+            sent.message_id
+        )
+
+
+    if not message_ids:
+        return
+
+
+    warning = await update.message.reply_text(
+        "⏳ این مجموعه تا ۱ دقیقه دیگر حذف می‌شود."
+    )
+
+
+    message_ids.append(
+        warning.message_id
+    )
+
+
+    asyncio.create_task(
+        delete_media_later(
+            context.bot,
+            update.effective_chat.id,
+            message_ids
+        )
+    )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -115,49 +248,39 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         content_id = context.args[0]
 
-        content = get_content(content_id)
 
-        if content:
+        # لینک مجموعه
+        if content_id.startswith("collection_"):
 
-            content_type, file_id = content
+            collection = context.application.bot_data.get(
+                content_id
+            )
 
+            if collection:
 
-            if content_type == "photo":
-
-                sent_message = await update.message.reply_photo(
-                    photo=file_id
+                await send_collection(
+                    update,
+                    context,
+                    collection
                 )
 
-
-            elif content_type == "video":
-
-                sent_message = await update.message.reply_video(
-                    video=file_id
-                )
-
-
-            else:
                 return
 
 
-            warning_message = await update.message.reply_text(
-                "⏳ این رسانه تا ۱ دقیقه دیگر حذف می‌شود."
-            )
-
-
-            asyncio.create_task(
-                delete_media_later(
-                    context.bot,
-                    update.effective_chat.id,
-                    sent_message.message_id,
-                    warning_message.message_id
-                )
-            )
+        # لینک تک رسانه
+        if await send_content(
+            update,
+            context,
+            content_id
+        ):
 
             return
 
 
-    if await check_member(user_id, context):
+    if await check_member(
+        user_id,
+        context
+    ):
 
         text = (
             "سلام عشق🥰\n"
@@ -200,11 +323,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
             "برای استفاده از ربات ابتدا عضو کانال شوید.",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=InlineKeyboardMarkup(
+                keyboard
+            )
         )
 
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     query = update.callback_query
 
@@ -215,7 +343,10 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "check":
 
-        if await check_member(user_id, context):
+        if await check_member(
+            user_id,
+            context
+        ):
 
             add_user(user_id)
 
@@ -229,21 +360,29 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer(
                 "❌ هنوز عضو کانال نیستید.",
                 show_alert=True
-            )
+                )
 
 
 
-async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def messages(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     user_id = update.effective_user.id
-
 
     if user_id != ADMIN_ID:
         return
 
 
-    text = update.message.text
+    message = update.message
 
+    text = message.text or ""
+
+
+    # =========================
+    # 📢 ارسال همگانی
+    # =========================
 
     if context.user_data.get("broadcast"):
 
@@ -257,7 +396,7 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             try:
 
-                await update.message.copy(
+                await message.copy(
                     chat_id=user
                 )
 
@@ -271,7 +410,7 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
 
 
-        await update.message.reply_text(
+        await message.reply_text(
             f"✅ ارسال همگانی انجام شد\n\n"
             f"موفق: {success}\n"
             f"ناموفق: {failed}",
@@ -281,24 +420,212 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
+    # =========================
+    # 📦 آپلود مجموعه
+    # =========================
+
+    if context.user_data.get("collection"):
+
+        # پایان مجموعه
+
+        if text == "✅ پایان مجموعه":
+
+            items = context.user_data.get(
+                "collection_items",
+                []
+            )
+
+
+            if not items:
+
+                await message.reply_text(
+                    "❌ هنوز هیچ رسانه‌ای اضافه نکردی."
+                )
+
+                return
+
+
+            number = get_last_content_number()
+
+            collection_id = (
+                f"collection_{number}"
+            )
+
+
+            context.application.bot_data[
+                collection_id
+            ] = items
+
+
+            bot_info = await context.bot.get_me()
+
+            bot_username = bot_info.username
+
+
+            link = (
+                f"https://t.me/"
+                f"{bot_username}"
+                f"?start={collection_id}"
+            )
+
+
+            await message.reply_text(
+                f"✅ مجموعه ساخته شد!\n\n"
+                f"🎬 تعداد رسانه‌ها: "
+                f"{len(items)}\n\n"
+                f"🔗 لینک اختصاصی:\n"
+                f"{link}",
+                reply_markup=panel_keyboard
+            )
+
+
+            context.user_data.clear()
+
+            return
+
+
+        # لغو مجموعه
+
+        if text == "❌ لغو مجموعه":
+
+            context.user_data.clear()
+
+            await message.reply_text(
+                "❌ ساخت مجموعه لغو شد.",
+                reply_markup=panel_keyboard
+            )
+
+            return
+
+
+        # دریافت عکس
+
+        if message.photo:
+
+            file_id = message.photo[-1].file_id
+
+            caption = message.caption or ""
+
+
+            number = get_last_content_number()
+
+            content_id = f"photo_{number}"
+
+
+            add_content(
+                content_id,
+                "photo",
+                file_id,
+                "photo",
+                caption
+            )
+
+
+            items = context.user_data.setdefault(
+                "collection_items",
+                []
+            )
+
+
+            items.append(
+                content_id
+            )
+
+
+            await message.reply_text(
+                f"✅ عکس {len(items)} به مجموعه اضافه شد.\n\n"
+                f"برای اضافه کردن رسانه بعدی، "
+                f"همان‌طور ارسالش کن.\n\n"
+                f"وقتی تمام شد:\n"
+                f"«✅ پایان مجموعه»"
+            )
+
+            return
+
+
+        # دریافت فیلم
+
+        if message.video:
+
+            file_id = message.video.file_id
+
+            caption = message.caption or ""
+
+
+            number = get_last_content_number()
+
+            content_id = f"video_{number}"
+
+
+            add_content(
+                content_id,
+                "video",
+                file_id,
+                "video",
+                caption
+            )
+
+
+            items = context.user_data.setdefault(
+                "collection_items",
+                []
+            )
+
+
+            items.append(
+                content_id
+            )
+
+
+            await message.reply_text(
+                f"✅ فیلم {len(items)} به مجموعه اضافه شد.\n\n"
+                f"برای اضافه کردن رسانه بعدی، "
+                f"همان‌طور ارسالش کن.\n\n"
+                f"وقتی تمام شد:\n"
+                f"«✅ پایان مجموعه»"
+            )
+
+            return
+
+
+    # =========================
+    # 📸 آپلود تک رسانه
+    # =========================
+
     if context.user_data.get("upload"):
 
-        upload_type = context.user_data["upload"]
+        upload_type = context.user_data[
+            "upload"
+        ]
 
 
-        if upload_type == "photo" and update.message.photo:
+        # عکس
 
-            file_id = update.message.photo[-1].file_id
+        if (
+            upload_type == "photo"
+            and message.photo
+        ):
+
+            file_id = message.photo[-1].file_id
+
+            caption = message.caption or ""
 
 
-        elif upload_type == "video" and update.message.video:
+        # فیلم
 
-            file_id = update.message.video.file_id
+        elif (
+            upload_type == "video"
+            and message.video
+        ):
+
+            file_id = message.video.file_id
+
+            caption = message.caption or ""
 
 
         else:
 
-            await update.message.reply_text(
+            await message.reply_text(
                 "❌ فایل مناسب ارسال نشده."
             )
 
@@ -307,14 +634,17 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         number = get_last_content_number()
 
-        content_id = f"{upload_type}_{number}"
+        content_id = (
+            f"{upload_type}_{number}"
+        )
 
 
         add_content(
             content_id,
             upload_type,
             file_id,
-            upload_type
+            upload_type,
+            caption
         )
 
 
@@ -324,17 +654,19 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
         link = (
-            f"https://t.me/{bot_username}"
+            f"https://t.me/"
+            f"{bot_username}"
             f"?start={content_id}"
         )
 
 
-        await update.message.reply_text(
-            f"✅ محتوا ذخیره شد\n\n"
-            f"شناسه:\n"
+        await message.reply_text(
+            f"✅ محتوا ذخیره شد.\n\n"
+            f"🆔 شناسه:\n"
             f"{content_id}\n\n"
             f"🔗 لینک اختصاصی:\n"
-            f"{link}"
+            f"{link}",
+            reply_markup=panel_keyboard
         )
 
 
@@ -343,9 +675,13 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
+    # =========================
+    # 👑 پنل مدیریت
+    # =========================
+
     if text == "👑 پنل مدیریت":
 
-        await update.message.reply_text(
+        await message.reply_text(
             "👑 پنل مدیریت",
             reply_markup=panel_keyboard
         )
@@ -353,9 +689,13 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
+    # =========================
+    # 👥 تعداد کاربران
+    # =========================
+
     if text == "👥 تعداد کاربران":
 
-        await update.message.reply_text(
+        await message.reply_text(
             f"👥 تعداد کاربران:\n\n"
             f"{get_total_users()} نفر"
         )
@@ -363,9 +703,13 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
+    # =========================
+    # 📊 آمار حرفه‌ای
+    # =========================
+
     if text == "📊 آمار حرفه‌ای":
 
-        await update.message.reply_text(
+        await message.reply_text(
             f"📊 آمار ربات\n\n"
             f"👥 کل کاربران:\n"
             f"{get_total_users()}\n\n"
@@ -373,52 +717,110 @@ async def messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{get_today_users()}\n\n"
             f"📦 تعداد محتوا:\n"
             f"{get_total_contents()}\n\n"
-            f"👁 مجموع بازدید محتوا:\n"
+            f"👁 مجموع بازدید:\n"
             f"{get_total_views()}"
         )
 
         return
 
 
+    # =========================
+    # 📢 ارسال همگانی
+    # =========================
+
     if text == "📢 ارسال همگانی":
 
-        context.user_data["broadcast"] = True
+        context.user_data[
+            "broadcast"
+        ] = True
 
-        await update.message.reply_text(
+
+        await message.reply_text(
             "📢 پیام همگانی را ارسال کن.\n\n"
-            "متن، عکس یا فیلم می‌توانی بفرستی."
+            "متن، عکس یا فیلم می‌توانی بفرستی.\n\n"
+            "برای لغو، پنل مدیریت را باز کن."
         )
 
         return
 
+
+    # =========================
+    # 📸 افزودن عکس
+    # =========================
 
     if text == "📸 افزودن عکس":
 
-        context.user_data["upload"] = "photo"
+        context.user_data[
+            "upload"
+        ] = "photo"
 
-        await update.message.reply_text(
-            "📸 عکس را ارسال کن."
+
+        await message.reply_text(
+            "📸 عکس را همراه با کپشن دلخواهت ارسال کن."
         )
 
         return
 
+
+    # =========================
+    # 🎬 افزودن فیلم
+    # =========================
 
     if text == "🎬 افزودن فیلم":
 
-        context.user_data["upload"] = "video"
+        context.user_data[
+            "upload"
+        ] = "video"
 
-        await update.message.reply_text(
-            "🎬 فیلم را ارسال کن."
+
+        await message.reply_text(
+            "🎬 فیلم را همراه با کپشن دلخواهت ارسال کن."
         )
 
         return
 
+
+    # =========================
+    # 📦 ساخت مجموعه
+    # =========================
+
+    if text == "📦 ساخت مجموعه":
+
+        context.user_data.clear()
+
+        context.user_data[
+            "collection"
+        ] = True
+
+        context.user_data[
+            "collection_items"
+        ] = []
+
+
+        await message.reply_text(
+            "📦 حالت ساخت مجموعه فعال شد.\n\n"
+            "حالا عکس‌ها و فیلم‌ها را یکی‌یکی "
+            "برای من ارسال کن.\n\n"
+            "می‌توانی برای هر رسانه کپشن جداگانه "
+            "بنویسی.\n\n"
+            "وقتی تمام شد، دکمه:\n"
+            "«✅ پایان مجموعه»\n"
+            "را بزن.",
+            reply_markup=collection_keyboard
+        )
+
+        return
+
+
+    # =========================
+    # 🔙 بازگشت
+    # =========================
 
     if text == "🔙 بازگشت":
 
         context.user_data.clear()
 
-        await update.message.reply_text(
+        await message.reply_text(
             "برگشتیم.",
             reply_markup=admin_keyboard
         )
