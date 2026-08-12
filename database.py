@@ -5,11 +5,14 @@ from datetime import datetime
 DB = "users.db"
 
 
+def get_connection():
+    return sqlite3.connect(DB)
+
+
 def init_db():
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
-
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
@@ -18,7 +21,6 @@ def init_db():
     )
     """)
 
-
     cur.execute("""
     CREATE TABLE IF NOT EXISTS contents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,22 +28,20 @@ def init_db():
         content_type TEXT,
         file_id TEXT,
         category TEXT,
+        caption TEXT,
         views INTEGER DEFAULT 0,
         created_date TEXT
     )
     """)
 
-
     conn.commit()
     conn.close()
 
 
-
 def add_user(user_id):
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
-
 
     cur.execute(
         """
@@ -55,17 +55,14 @@ def add_user(user_id):
         )
     )
 
-
     conn.commit()
     conn.close()
 
 
-
 def get_total_users():
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
-
 
     cur.execute(
         "SELECT COUNT(*) FROM users"
@@ -73,21 +70,17 @@ def get_total_users():
 
     result = cur.fetchone()[0]
 
-
     conn.close()
 
     return result
 
 
-
 def get_today_users():
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
 
-
     today = datetime.now().strftime("%Y-%m-%d")
-
 
     cur.execute(
         """
@@ -98,32 +91,25 @@ def get_today_users():
         (today,)
     )
 
-
     result = cur.fetchone()[0]
-
 
     conn.close()
 
     return result
 
 
-
 def get_all_users():
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
-
 
     cur.execute(
         "SELECT user_id FROM users"
     )
 
-
     users = cur.fetchall()
 
-
     conn.close()
-
 
     return [
         user[0]
@@ -131,11 +117,16 @@ def get_all_users():
     ]
 
 
-def add_content(content_id, content_type, file_id, category):
+def add_content(
+    content_id,
+    content_type,
+    file_id,
+    category,
+    caption=""
+):
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
-
 
     cur.execute(
         """
@@ -145,43 +136,40 @@ def add_content(content_id, content_type, file_id, category):
             content_type,
             file_id,
             category,
+            caption,
             created_date
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
         (
             content_id,
             content_type,
             file_id,
             category,
+            caption,
             datetime.now().strftime("%Y-%m-%d")
         )
     )
-
 
     conn.commit()
     conn.close()
 
 
-
 def get_content(content_id):
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
-
 
     cur.execute(
         """
-        SELECT content_type, file_id
+        SELECT content_type, file_id, caption
         FROM contents
         WHERE content_id=?
         """,
         (content_id,)
     )
 
-
     result = cur.fetchone()
-
 
     if result:
 
@@ -196,70 +184,54 @@ def get_content(content_id):
 
         conn.commit()
 
-
     conn.close()
 
     return result
-
 
 
 def get_last_content_number():
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
-
 
     cur.execute(
         "SELECT COUNT(*) FROM contents"
     )
 
-
     result = cur.fetchone()[0]
 
-
     conn.close()
-
 
     return result + 1
 
 
-
 def get_total_contents():
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
-
 
     cur.execute(
         "SELECT COUNT(*) FROM contents"
     )
 
-
     result = cur.fetchone()[0]
 
-
     conn.close()
-
 
     return result
 
 
-
 def get_total_views():
 
-    conn = sqlite3.connect(DB)
+    conn = get_connection()
     cur = conn.cursor()
 
-
     cur.execute(
-        "SELECT SUM(views) FROM contents"
+        "SELECT COALESCE(SUM(views), 0) FROM contents"
     )
-
 
     result = cur.fetchone()[0]
 
-
     conn.close()
 
-
-    return result or 0
+    return result
