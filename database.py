@@ -14,7 +14,10 @@ def init_db():
     conn = get_connection()
     cur = conn.cursor()
 
-    # Users
+    # =========================
+    # USERS
+    # =========================
+
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
@@ -22,7 +25,10 @@ def init_db():
     )
     """)
 
-    # Contents
+    # =========================
+    # CONTENTS
+    # =========================
+
     cur.execute("""
     CREATE TABLE IF NOT EXISTS contents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,11 +38,15 @@ def init_db():
         category TEXT,
         caption TEXT DEFAULT '',
         views INTEGER DEFAULT 0,
+        downloads INTEGER DEFAULT 0,
         created_date TEXT
     )
     """)
 
-    # Collection items
+    # =========================
+    # COLLECTIONS
+    # =========================
+
     cur.execute("""
     CREATE TABLE IF NOT EXISTS collections (
         collection_id TEXT,
@@ -46,17 +56,29 @@ def init_db():
     )
     """)
 
-    # Migration برای دیتابیس‌های قدیمی
+    # =========================
+    # MIGRATION
+    # =========================
+
     cur.execute("PRAGMA table_info(contents)")
+
     columns = [
         row[1]
         for row in cur.fetchall()
     ]
 
     if "caption" not in columns:
+
         cur.execute("""
         ALTER TABLE contents
         ADD COLUMN caption TEXT DEFAULT ''
+        """)
+
+    if "downloads" not in columns:
+
+        cur.execute("""
+        ALTER TABLE contents
+        ADD COLUMN downloads INTEGER DEFAULT 0
         """)
 
     conn.commit()
@@ -222,6 +244,78 @@ def get_content(content_id):
     return result
 
 
+# ==========================================
+# DOWNLOADS
+# ==========================================
+
+def add_download(content_id):
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE contents
+        SET downloads = downloads + 1
+        WHERE content_id=?
+        """,
+        (content_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_downloads(content_id):
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT downloads
+        FROM contents
+        WHERE content_id=?
+        """,
+        (content_id,)
+    )
+
+    result = cur.fetchone()
+
+    conn.close()
+
+    if result:
+        return result[0]
+
+    return 0
+
+
+def get_total_downloads():
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT COALESCE(
+            SUM(downloads),
+            0
+        )
+        FROM contents
+        """
+    )
+
+    result = cur.fetchone()[0]
+
+    conn.close()
+
+    return result
+
+
+# ==========================================
+# CONTENT STATS
+# ==========================================
+
 def get_last_content_number():
 
     conn = get_connection()
@@ -260,7 +354,13 @@ def get_total_views():
     cur = conn.cursor()
 
     cur.execute(
-        "SELECT COALESCE(SUM(views), 0) FROM contents"
+        """
+        SELECT COALESCE(
+            SUM(views),
+            0
+        )
+        FROM contents
+        """
     )
 
     result = cur.fetchone()[0]
