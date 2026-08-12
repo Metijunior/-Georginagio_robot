@@ -14,6 +14,7 @@ def init_db():
     conn = get_connection()
     cur = conn.cursor()
 
+    # Users
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
@@ -21,6 +22,7 @@ def init_db():
     )
     """)
 
+    # Contents
     cur.execute("""
     CREATE TABLE IF NOT EXISTS contents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,15 +30,42 @@ def init_db():
         content_type TEXT,
         file_id TEXT,
         category TEXT,
-        caption TEXT,
+        caption TEXT DEFAULT '',
         views INTEGER DEFAULT 0,
         created_date TEXT
     )
     """)
 
+    # Collection items
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS collections (
+        collection_id TEXT,
+        content_id TEXT,
+        position INTEGER,
+        PRIMARY KEY (collection_id, content_id)
+    )
+    """)
+
+    # Migration برای دیتابیس‌های قدیمی
+    cur.execute("PRAGMA table_info(contents)")
+    columns = [
+        row[1]
+        for row in cur.fetchall()
+    ]
+
+    if "caption" not in columns:
+        cur.execute("""
+        ALTER TABLE contents
+        ADD COLUMN caption TEXT DEFAULT ''
+        """)
+
     conn.commit()
     conn.close()
 
+
+# ==========================================
+# USERS
+# ==========================================
 
 def add_user(user_id):
 
@@ -116,6 +145,10 @@ def get_all_users():
         for user in users
     ]
 
+
+# ==========================================
+# CONTENT
+# ==========================================
 
 def add_content(
     content_id,
@@ -235,3 +268,79 @@ def get_total_views():
     conn.close()
 
     return result
+
+
+# ==========================================
+# COLLECTIONS
+# ==========================================
+
+def create_collection(collection_id):
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        DELETE FROM collections
+        WHERE collection_id=?
+        """,
+        (collection_id,)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def add_to_collection(
+    collection_id,
+    content_id,
+    position
+):
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT OR REPLACE INTO collections
+        (
+            collection_id,
+            content_id,
+            position
+        )
+        VALUES (?, ?, ?)
+        """,
+        (
+            collection_id,
+            content_id,
+            position
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_collection(collection_id):
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT content_id
+        FROM collections
+        WHERE collection_id=?
+        ORDER BY position ASC
+        """,
+        (collection_id,)
+    )
+
+    rows = cur.fetchall()
+
+    conn.close()
+
+    return [
+        row[0]
+        for row in rows
+    ]
