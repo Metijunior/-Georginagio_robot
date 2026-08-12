@@ -28,7 +28,7 @@ from database import (
     get_last_content_number,
     get_all_users,
     get_total_contents,
-    get_total_views
+    get_total_views,
     create_collection,
     add_to_collection,
     get_collection
@@ -255,9 +255,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # لینک مجموعه
         if content_id.startswith("collection_"):
 
-            collection = context.application.bot_data.get(
-                content_id
-            )
+            collection = get_collection(content_id)
 
             if collection:
 
@@ -363,8 +361,7 @@ async def button(
             await query.answer(
                 "❌ هنوز عضو کانال نیستید.",
                 show_alert=True
-                )
-
+            )
 
 
 async def messages(
@@ -455,9 +452,15 @@ async def messages(
             )
 
 
-            context.application.bot_data[
-                collection_id
-            ] = items
+            create_collection(collection_id)
+
+            for position, item_id in enumerate(items, start=1):
+
+                add_to_collection(
+                    collection_id,
+                    item_id,
+                    position
+                )
 
 
             bot_info = await context.bot.get_me()
@@ -741,7 +744,7 @@ async def messages(
         await message.reply_text(
             "📢 پیام همگانی را ارسال کن.\n\n"
             "متن، عکس یا فیلم می‌توانی بفرستی.\n\n"
-            "برای لغو، پنل مدیریت را باز کن."
+            "برای لغو، «🔙 بازگشت» را بزن."
         )
 
         return
@@ -804,8 +807,8 @@ async def messages(
             "📦 حالت ساخت مجموعه فعال شد.\n\n"
             "حالا عکس‌ها و فیلم‌ها را یکی‌یکی "
             "برای من ارسال کن.\n\n"
-            "می‌توانی برای هر رسانه کپشن جداگانه "
-            "بنویسی.\n\n"
+            "برای هر رسانه می‌توانی کپشن جداگانه "
+            "بگذاری.\n\n"
             "وقتی تمام شد، دکمه:\n"
             "«✅ پایان مجموعه»\n"
             "را بزن.",
@@ -831,11 +834,22 @@ async def messages(
         return
 
 
+# ==========================================
+# MAIN
+# ==========================================
+
 async def main():
 
     start_server()
 
     init_db()
+
+
+    if not TOKEN:
+
+        raise RuntimeError(
+            "BOT_TOKEN environment variable is not set."
+        )
 
 
     app = (
@@ -881,3 +895,4 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
