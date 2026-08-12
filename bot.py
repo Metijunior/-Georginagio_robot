@@ -29,6 +29,9 @@ from database import (
     get_all_users,
     get_total_contents,
     get_total_views
+    create_collection,
+    add_to_collection,
+    get_collection
 )
 
 from server import start_server
